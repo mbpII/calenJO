@@ -5,7 +5,7 @@ import { ColorDetectionFactory, StrategyType } from '@/lib';
 import { CalendarType } from '@/types/calendar';
 
 interface ImageUploaderProps {
-  onImageUpload: (file: File, strategy: StrategyType, calendarType: CalendarType, imagePreview: string) => void;
+  onImageUpload: (file: File, strategy: StrategyType, calendarType: CalendarType, imagePreview: string) => void | Promise<void>;
   onClear: () => void;
   selectedStrategy: StrategyType;
   onStrategyChange: (strategy: StrategyType) => void;
