@@ -74,7 +74,7 @@ export const CalendarProcessor: React.FC = () => {
       });
 
       // Step 3: Parse calendar events
-      const parsedData = parseCalendarFromOCR(ocrResults, year, month);
+      const parsedData = parseCalendarFromOCR(ocrResults, year, month, calendarType);
       
       setEvents(parsedData.events);
       setProcessingState({
