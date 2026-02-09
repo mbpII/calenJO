@@ -6,6 +6,7 @@ import { CalendarType } from '@/types/calendar';
 
 interface ImageUploaderProps {
   onImageUpload: (file: File, strategy: StrategyType, calendarType: CalendarType, imagePreview: string) => void;
+  onClear: () => void;
   selectedStrategy: StrategyType;
   onStrategyChange: (strategy: StrategyType) => void;
   selectedCalendarType: CalendarType;
@@ -15,6 +16,7 @@ interface ImageUploaderProps {
 
 export const ImageUploader: React.FC<ImageUploaderProps> = ({
   onImageUpload,
+  onClear,
   selectedStrategy,
   onStrategyChange,
   selectedCalendarType,
@@ -23,6 +25,22 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
 }) => {
   const [dragActive, setDragActive] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+
+  const handleFile = useCallback((file: File) => {
+    if (!file.type.startsWith('image/')) {
+      alert('Please upload an image file');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target?.result as string;
+      setPreview(result);
+      setFile(file);
+    };
+    reader.readAsDataURL(file);
+  }, []);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -43,7 +61,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     if (files && files[0]) {
       handleFile(files[0]);
     }
-  }, [selectedStrategy]);
+  }, [handleFile]);
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -52,19 +70,16 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     }
   };
 
-  const handleFile = (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      alert('Please upload an image file');
-      return;
+  const handleProcess = () => {
+    if (file && preview) {
+      onImageUpload(file, selectedStrategy, selectedCalendarType, preview);
     }
+  };
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const result = e.target?.result as string;
-      setPreview(result);
-      onImageUpload(file, selectedStrategy, selectedCalendarType, result);
-    };
-    reader.readAsDataURL(file);
+  const handleClear = () => {
+    setPreview(null);
+    setFile(null);
+    onClear();
   };
 
   const strategies = ColorDetectionFactory.getAllStrategies();
@@ -171,12 +186,30 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         {preview && (
           <div className="mt-6">
             <h3 className="text-sm font-medium text-gray-700 mb-2">Preview</h3>
-            <div className="relative rounded-lg overflow-hidden border border-gray-200">
+            <div className="relative rounded-lg overflow-hidden border border-gray-200 mb-4">
               <img
                 src={preview}
                 alt="Calendar preview"
                 className="max-w-full h-auto max-h-96 mx-auto"
               />
+            </div>
+            
+            {/* Action Buttons */}
+            <div className="flex gap-3">
+              <button
+                onClick={handleProcess}
+                disabled={isProcessing}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              >
+                {isProcessing ? 'Processing...' : 'Process Image'}
+              </button>
+              <button
+                onClick={handleClear}
+                disabled={isProcessing}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              >
+                Clear
+              </button>
             </div>
           </div>
         )}

@@ -93,6 +93,15 @@ export const CalendarProcessor: React.FC = () => {
     }
   }, [year, month]);
 
+  const handleClear = useCallback(() => {
+    setProcessingState({
+      status: 'idle',
+      progress: 0,
+      message: ''
+    });
+    setEvents([]);
+  }, []);
+
   const handleGenerateICS = async () => {
     setIsGenerating(true);
     try {
@@ -138,6 +147,7 @@ export const CalendarProcessor: React.FC = () => {
     <div className="max-w-4xl mx-auto space-y-6">
       <ImageUploader
         onImageUpload={handleImageUpload}
+        onClear={handleClear}
         selectedStrategy={selectedStrategy}
         onStrategyChange={setSelectedStrategy}
         selectedCalendarType={selectedCalendarType}
