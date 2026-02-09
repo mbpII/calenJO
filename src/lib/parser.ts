@@ -121,8 +121,9 @@ export function parseCalendarFromOCR(
     
     // Check if there's text after the date number in the same result
     const afterDate = text.replace(/\b\d{1,2}\b/, '').trim();
-    if (afterDate.length > 2) {
+    if (afterDate.length > 1) {
       eventTitle = cleanEventText(afterDate);
+      console.log(`📝 Found event text in same region: "${eventTitle}" from "${text}"`);
     }
     
     // In standard mode: use smarter proximity check
@@ -133,14 +134,17 @@ export function parseCalendarFromOCR(
       const xDiff = Math.abs(nextResult.region.x - result.region.x);
       
       // SMART CHECK: Must be same calendar cell (same row, nearby column)
+      // OR text vertically below the date (common in calendar layouts)
       // AND must contain actual text (not just another number)
-      const isSameRow = yDiff < 30;  // Tighter Y threshold
-      const isNearbyX = xDiff < 150;  // Tighter X threshold
+      const isSameRow = yDiff < 60;  // Allow same calendar row
+      const isDirectlyBelow = yDiff > 0 && yDiff < 100 && xDiff < 50; // Text below date
+      const isNearbyX = xDiff < 150;  // Nearby column
       const nextText = nextResult.text;
       const isNotJustANumber = !nextText.match(/^\d{1,2}$/);
       
-      if (isSameRow && isNearbyX && isNotJustANumber) {
+      if ((isSameRow || isDirectlyBelow) && isNearbyX && isNotJustANumber) {
         eventTitle = cleanEventText(nextText);
+        console.log(`📝 Found event text in nearby region: "${eventTitle}"`);
       }
     }
     
@@ -159,7 +163,7 @@ export function parseCalendarFromOCR(
     
     if (eventTitle) {
       const event: CalendarEvent = {
-        id: `event-${day}-${actualMonth}-${actualYear}-${Date.now()}`,
+        id: `event-${day}-${actualMonth}-${actualYear}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         title: eventTitle,
         date: new Date(actualYear, actualMonth - 1, day),
       };
