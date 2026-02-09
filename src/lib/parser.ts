@@ -1,10 +1,64 @@
 import { CalendarEvent, ParsedCalendarData, CalendarType } from '@/types/calendar';
 import { OCRResult } from './ocr';
 
+// Month context enum for tracking which month a date belongs to
+enum MonthContext {
+  PREVIOUS = 'previous',
+  CURRENT = 'current',
+  NEXT = 'next'
+}
+
+// Simple month tracker - detects month transitions based on day progression
+class MonthTracker {
+  private lastDay: number = 0;
+  private context: MonthContext = MonthContext.CURRENT;
+  private hasTransitionedToCurrent: boolean = false;
+  private currentWeek: number = -1;
+  
+  detectMonth(day: number, weekIndex: number): { context: MonthContext; monthOffset: number } {
+    // Reset when entering a new week
+    if (weekIndex !== this.currentWeek) {
+      this.currentWeek = weekIndex;
+      this.lastDay = 0;
+    }
+    
+    // Detect previous month: high days (25-31) at the start
+    if (weekIndex === 0 && day >= 25 && this.lastDay === 0) {
+      this.context = MonthContext.PREVIOUS;
+    }
+    // Detect transition to current month: day drops from high (28-31) to low (1-5)
+    else if (this.lastDay >= 28 && day <= 5 && !this.hasTransitionedToCurrent) {
+      this.context = MonthContext.CURRENT;
+      this.hasTransitionedToCurrent = true;
+    }
+    // Detect transition to next month: day drops in later weeks after we've been in current month
+    else if (this.lastDay >= 25 && day <= 5 && weekIndex >= 3 && this.hasTransitionedToCurrent) {
+      this.context = MonthContext.NEXT;
+    }
+    
+    this.lastDay = day;
+    
+    // Convert context to month offset
+    let monthOffset = 0;
+    if (this.context === MonthContext.PREVIOUS) monthOffset = -1;
+    else if (this.context === MonthContext.NEXT) monthOffset = 1;
+    
+    return { context: this.context, monthOffset };
+  }
+  
+  reset(): void {
+    this.lastDay = 0;
+    this.context = MonthContext.CURRENT;
+    this.hasTransitionedToCurrent = false;
+    this.currentWeek = -1;
+  }
+}
+
 interface DateInfo {
   day: number;
   weekIndex: number;
   y: number;
+  resultIndex: number;
 }
 
 export function parseCalendarFromOCR(
@@ -14,6 +68,7 @@ export function parseCalendarFromOCR(
   calendarType: CalendarType = 'standard'
 ): ParsedCalendarData {
   const events: CalendarEvent[] = [];
+  const monthTracker = new MonthTracker();
   
   // Sort regions by Y position (top to bottom), then X (left to right)
   const sortedResults = [...ocrResults].sort((a, b) => {
@@ -25,8 +80,9 @@ export function parseCalendarFromOCR(
   // Assign week indices based on Y position
   const datesWithWeeks = assignWeekIndices(sortedResults);
   
-  // Calculate expected calendar layout
-  const calendarLayout = calculateCalendarLayout(year, month);
+  // Track month transitions as we process each date
+  let currentMonthOffset = 0;
+  let lastWeekIndex = -1;
   
   // Extract date numbers from text
   for (let i = 0; i < sortedResults.length; i++) {
@@ -43,25 +99,34 @@ export function parseCalendarFromOCR(
     const dateInfo = datesWithWeeks.get(i);
     if (!dateInfo) continue;
     
-    // Determine actual month/year based on position
-    const { actualYear, actualMonth, actualDay } = determineActualDate(
-      day,
-      dateInfo.weekIndex,
-      calendarLayout,
-      year,
-      month
-    );
+    // Detect which month this day belongs to
+    const { monthOffset } = monthTracker.detectMonth(day, dateInfo.weekIndex);
+    currentMonthOffset = monthOffset;
+    
+    // Calculate actual year and month
+    let actualYear = year;
+    let actualMonth = month + currentMonthOffset;
+    
+    // Handle year boundaries
+    if (actualMonth === 0) {
+      actualMonth = 12;
+      actualYear = year - 1;
+    } else if (actualMonth === 13) {
+      actualMonth = 1;
+      actualYear = year + 1;
+    }
     
     // Look for event text in the same region or nearby
     let eventTitle = '';
     
     // Check if there's text after the date number in the same result
     const afterDate = text.replace(/\b\d{1,2}\b/, '').trim();
-    if (afterDate.length > 2) {
+    if (afterDate.length > 1) {
       eventTitle = cleanEventText(afterDate);
+      console.log(`📝 Found event text in same region: "${eventTitle}" from "${text}"`);
     }
     
-    // In standard mode: use smarter proximity check (Option B)
+    // In standard mode: use smarter proximity check
     // In jojo mode: skip adjacent region lookup entirely
     if (!eventTitle && calendarType === 'standard' && i + 1 < sortedResults.length) {
       const nextResult = sortedResults[i + 1];
@@ -69,14 +134,17 @@ export function parseCalendarFromOCR(
       const xDiff = Math.abs(nextResult.region.x - result.region.x);
       
       // SMART CHECK: Must be same calendar cell (same row, nearby column)
+      // OR text vertically below the date (common in calendar layouts)
       // AND must contain actual text (not just another number)
-      const isSameRow = yDiff < 30;  // Tighter Y threshold
-      const isNearbyX = xDiff < 150;  // Tighter X threshold
+      const isSameRow = yDiff < 60;  // Allow same calendar row
+      const isDirectlyBelow = yDiff > 0 && yDiff < 100 && xDiff < 50; // Text below date
+      const isNearbyX = xDiff < 150;  // Nearby column
       const nextText = nextResult.text;
       const isNotJustANumber = !nextText.match(/^\d{1,2}$/);
       
-      if (isSameRow && isNearbyX && isNotJustANumber) {
+      if ((isSameRow || isDirectlyBelow) && isNearbyX && isNotJustANumber) {
         eventTitle = cleanEventText(nextText);
+        console.log(`📝 Found event text in nearby region: "${eventTitle}"`);
       }
     }
     
@@ -95,9 +163,9 @@ export function parseCalendarFromOCR(
     
     if (eventTitle) {
       const event: CalendarEvent = {
-        id: `event-${actualDay}-${actualMonth}-${actualYear}-${Date.now()}`,
+        id: `event-${day}-${actualMonth}-${actualYear}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         title: eventTitle,
-        date: new Date(actualYear, actualMonth - 1, actualDay),
+        date: new Date(actualYear, actualMonth - 1, day),
       };
       
       // Try to extract time from the title
@@ -110,6 +178,9 @@ export function parseCalendarFromOCR(
       }
       
       events.push(event);
+      
+      // Log for debugging
+      console.log(`📅 Detected: ${actualMonth}/${day}/${actualYear} - "${eventTitle}" (${monthOffset > 0 ? 'next' : monthOffset < 0 ? 'prev' : 'current'} month)`);
     }
   }
   
@@ -162,128 +233,14 @@ function assignWeekIndices(results: OCRResult[]): Map<number, DateInfo> {
       dateMap.set(resultIndex, {
         day,
         weekIndex,
-        y: result.region.y
+        y: result.region.y,
+        resultIndex
       });
     }
     resultIndex++;
   }
   
   return dateMap;
-}
-
-interface CalendarLayout {
-  firstDayOfMonth: number; // 0 = Sunday, 1 = Monday, etc.
-  daysInMonth: number;
-  daysInPrevMonth: number;
-  weeks: number[][]; // Each week contains the day numbers that should appear
-}
-
-function calculateCalendarLayout(year: number, month: number): CalendarLayout {
-  const firstDayOfMonth = new Date(year, month - 1, 1).getDay();
-  const daysInMonth = new Date(year, month, 0).getDate();
-  const daysInPrevMonth = new Date(year, month - 1, 0).getDate();
-  
-  // Build calendar grid
-  const weeks: number[][] = [];
-  let currentWeek: number[] = [];
-  
-  // Add days from previous month
-  for (let i = firstDayOfMonth - 1; i >= 0; i--) {
-    currentWeek.unshift(daysInPrevMonth - i);
-  }
-  
-  // Add days from current month
-  for (let day = 1; day <= daysInMonth; day++) {
-    if (currentWeek.length === 7) {
-      weeks.push(currentWeek);
-      currentWeek = [];
-    }
-    currentWeek.push(day);
-  }
-  
-  // Add days from next month to complete the last week
-  let nextMonthDay = 1;
-  while (currentWeek.length < 7) {
-    currentWeek.push(nextMonthDay++);
-  }
-  weeks.push(currentWeek);
-  
-  // Add more weeks if needed (calendars usually show 6 weeks)
-  while (weeks.length < 6) {
-    const newWeek: number[] = [];
-    for (let i = 0; i < 7; i++) {
-      newWeek.push(nextMonthDay++);
-    }
-    weeks.push(newWeek);
-  }
-  
-  return {
-    firstDayOfMonth,
-    daysInMonth,
-    daysInPrevMonth,
-    weeks
-  };
-}
-
-function determineActualDate(
-  detectedDay: number,
-  weekIndex: number,
-  layout: CalendarLayout,
-  calendarYear: number,
-  calendarMonth: number
-): { actualYear: number; actualMonth: number; actualDay: number } {
-  // Get the expected days for this week
-  const weekDays = layout.weeks[weekIndex];
-  if (!weekDays) {
-    return { actualYear: calendarYear, actualMonth: calendarMonth, actualDay: detectedDay };
-  }
-  
-  // Find the position of the detected day in this week
-  const dayIndex = weekDays.indexOf(detectedDay);
-  if (dayIndex === -1) {
-    return { actualYear: calendarYear, actualMonth: calendarMonth, actualDay: detectedDay };
-  }
-  
-  // Determine which month this day belongs to
-  let actualYear = calendarYear;
-  let actualMonth = calendarMonth;
-  
-  if (weekIndex === 0) {
-    // First week - check if this is from previous month
-    const lastDayOfPrevMonthWeek = layout.firstDayOfMonth - 1;
-    if (dayIndex <= lastDayOfPrevMonthWeek && detectedDay > 20) {
-      // This is from the previous month (large day numbers in first week)
-      actualMonth = calendarMonth - 1;
-      if (actualMonth === 0) {
-        actualMonth = 12;
-        actualYear = calendarYear - 1;
-      }
-    }
-  } else if (weekIndex >= layout.weeks.length - 2) {
-    // Last weeks - check if this is from next month
-    const lastDayOfMonthIndex = weekDays.indexOf(layout.daysInMonth);
-    if (lastDayOfMonthIndex !== -1 && dayIndex > lastDayOfMonthIndex) {
-      // This is from the next month (after the last day of current month)
-      actualMonth = calendarMonth + 1;
-      if (actualMonth === 13) {
-        actualMonth = 1;
-        actualYear = calendarYear + 1;
-      }
-    } else if (detectedDay < 15 && weekIndex > 0) {
-      // Small day number in later week suggests next month
-      const prevWeek = layout.weeks[weekIndex - 1];
-      const hasCurrentMonthDays = prevWeek.some(d => d >= 20 || d <= layout.daysInMonth);
-      if (hasCurrentMonthDays) {
-        actualMonth = calendarMonth + 1;
-        if (actualMonth === 13) {
-          actualMonth = 1;
-          actualYear = calendarYear + 1;
-        }
-      }
-    }
-  }
-  
-  return { actualYear, actualMonth, actualDay: detectedDay };
 }
 
 function cleanEventText(text: string): string {
