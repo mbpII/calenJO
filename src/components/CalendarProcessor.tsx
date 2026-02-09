@@ -74,7 +74,7 @@ export const CalendarProcessor: React.FC = () => {
       });
 
       // Step 3: Parse calendar events
-      const parsedData = parseCalendarFromOCR(ocrResults, year, month);
+      const parsedData = parseCalendarFromOCR(ocrResults, year, month, calendarType);
       
       setEvents(parsedData.events);
       setProcessingState({
@@ -92,6 +92,15 @@ export const CalendarProcessor: React.FC = () => {
       });
     }
   }, [year, month]);
+
+  const handleClear = useCallback(() => {
+    setProcessingState({
+      status: 'idle',
+      progress: 0,
+      message: ''
+    });
+    setEvents([]);
+  }, []);
 
   const handleGenerateICS = async () => {
     setIsGenerating(true);
@@ -138,6 +147,7 @@ export const CalendarProcessor: React.FC = () => {
     <div className="max-w-4xl mx-auto space-y-6">
       <ImageUploader
         onImageUpload={handleImageUpload}
+        onClear={handleClear}
         selectedStrategy={selectedStrategy}
         onStrategyChange={setSelectedStrategy}
         selectedCalendarType={selectedCalendarType}
