@@ -107,7 +107,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                 </option>
               ))}
             </select>
-            <p className="mt-1 text-sm text-gray-500">
+            <p className="mt-1 text-sm text-gray-500" suppressHydrationWarning>
               {selectedStrategy === 'canvas' 
                 ? 'Canvas: Fast processing, works best with clear red text on white background'
                 : 'OpenCV: More robust for complex colors and varying lighting conditions (slower to load)'}
