@@ -3,6 +3,7 @@
 import React, { useState, useCallback } from 'react';
 import { ColorDetectionFactory, StrategyType } from '@/lib';
 import { CalendarType } from '@/types/calendar';
+import { CropScreen } from './CropScreen';
 
 interface ImageUploaderProps {
   onImageUpload: (file: File, strategy: StrategyType, calendarType: CalendarType, imagePreview: string) => void | Promise<void>;
@@ -26,6 +27,8 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   const [dragActive, setDragActive] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [showCropScreen, setShowCropScreen] = useState(false);
+  const [originalPreview, setOriginalPreview] = useState<string | null>(null);
 
   const handleFile = useCallback((file: File) => {
     if (!file.type.startsWith('image/')) {
@@ -36,8 +39,9 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     const reader = new FileReader();
     reader.onload = (e) => {
       const result = e.target?.result as string;
-      setPreview(result);
+      setOriginalPreview(result);
       setFile(file);
+      setShowCropScreen(true); // Show crop screen after file upload
     };
     reader.readAsDataURL(file);
   }, []);
@@ -70,6 +74,22 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     }
   };
 
+  const handleCropComplete = useCallback((croppedImage: string) => {
+    setPreview(croppedImage);
+    setShowCropScreen(false);
+  }, []);
+
+  const handleSkipCrop = useCallback(() => {
+    setPreview(originalPreview);
+    setShowCropScreen(false);
+  }, [originalPreview]);
+
+  const handleCancelCrop = useCallback(() => {
+    setShowCropScreen(false);
+    setOriginalPreview(null);
+    setFile(null);
+  }, []);
+
   const handleProcess = () => {
     if (file && preview) {
       onImageUpload(file, selectedStrategy, selectedCalendarType, preview);
@@ -79,6 +99,8 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   const handleClear = () => {
     setPreview(null);
     setFile(null);
+    setOriginalPreview(null);
+    setShowCropScreen(false);
     onClear();
   };
 
@@ -214,6 +236,16 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
           </div>
         )}
       </div>
+
+      {/* Crop Screen Modal */}
+      {showCropScreen && originalPreview && (
+        <CropScreen
+          imageSrc={originalPreview}
+          onCropComplete={handleCropComplete}
+          onSkip={handleSkipCrop}
+          onCancel={handleCancelCrop}
+        />
+      )}
     </div>
   );
 };

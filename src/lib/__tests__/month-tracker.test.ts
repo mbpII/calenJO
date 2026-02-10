@@ -14,31 +14,50 @@ class MonthTracker {
   private contextCount: number = 0;
   private currentWeek: number = 0;
   private hasTransitionedToCurrent: boolean = false;
+  private hasBeenInCurrentMonth: boolean = false;
   
   detectMonth(day: number, weekIndex: number = 0): MonthContext {
-    // Reset when jumping to a new week (to handle non-sequential reading)
-    if (weekIndex !== this.currentWeek) {
+    // Track week changes
+    const isNewWeek = weekIndex !== this.currentWeek;
+    if (isNewWeek) {
       this.currentWeek = weekIndex;
-      this.lastDay = 0; // Reset for new week context
+      // Don't reset lastDay here - we need it to detect day drops within the week
     }
     
-    // Detect previous month: high days (25-31) in first week
-    if (weekIndex === 0 && day >= 25 && this.lastDay === 0) {
+    // Detect previous month: high days (25-31) in first week when starting fresh
+    if (weekIndex === 0 && day >= 25 && this.lastDay === 0 && !this.hasBeenInCurrentMonth) {
       this.context = MonthContext.PREVIOUS;
     }
     // Detect transition to current month: day drops from high (28-31) to low (1-5)
     else if (this.lastDay >= 28 && day <= 5 && !this.hasTransitionedToCurrent) {
       this.context = MonthContext.CURRENT;
       this.hasTransitionedToCurrent = true;
+      this.hasBeenInCurrentMonth = true;
     }
-    // Detect transition to next month: day drops from high to low in later weeks after we've been in current month
-    else if (this.lastDay >= 25 && day <= 5 && weekIndex >= 3 && this.hasTransitionedToCurrent) {
+    // Detect transition to next month: day drops from high (25-31) to low (1-5) in later weeks
+    // Only after we've been in the current month
+    else if (this.lastDay >= 25 && day <= 5 && weekIndex >= 3 && this.hasBeenInCurrentMonth) {
       this.context = MonthContext.NEXT;
+    }
+    // When entering a new week (4+) with high day numbers after being in current month
+    // we're still in current month (just processing the end of the month)
+    else if (isNewWeek && day >= 25 && this.hasBeenInCurrentMonth && weekIndex >= 3) {
+      this.context = MonthContext.CURRENT;
+      this.hasTransitionedToCurrent = true; // Mark that we've transitioned to current month
     }
     // Track how many days we've seen in current context
     else if (day === this.lastDay + 1 || (this.lastDay === 0 && day === 1)) {
-      // Sequential day - stay in current context
+      // Sequential day - mark that we're in current month
+      if (!this.hasBeenInCurrentMonth && weekIndex > 0 && day >= 1 && day <= 31) {
+        this.hasBeenInCurrentMonth = true;
+        this.hasTransitionedToCurrent = true;
+      }
       this.contextCount++;
+    }
+    // When we see a non-sequential jump to middle-of-month values (not overflow), we're in current month
+    else if (!this.hasBeenInCurrentMonth && day > 5 && day < 25) {
+      this.hasBeenInCurrentMonth = true;
+      this.hasTransitionedToCurrent = true; // Mark that we've transitioned to current month
     }
     
     this.lastDay = day;
@@ -51,6 +70,7 @@ class MonthTracker {
     this.contextCount = 0;
     this.currentWeek = 0;
     this.hasTransitionedToCurrent = false;
+    this.hasBeenInCurrentMonth = false;
   }
 }
 

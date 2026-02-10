@@ -55,9 +55,9 @@ describe('parseCalendarFromOCR - Month Overflow Detection', () => {
     it('should parse last day of month correctly', () => {
       // February 2024, day 29 (leap year)
       // Feb 2024 has 5 weeks (weeks 0-4), so week 4 is the last week
-      const ocrResults: OCRResult[] = [
+      const ocrResults = withCalendarStructure([
         createOCRResult('29 End', 300, 350) // Week 5 (row 4)
-      ];
+      ]);
 
       const result = parseCalendarFromOCR(ocrResults, 2024, 2);
 
@@ -86,10 +86,10 @@ describe('parseCalendarFromOCR - Month Overflow Detection', () => {
     it('should handle large day numbers (28-31) in first week as previous month', () => {
       // March 2024 starts on Friday
       // First week shows: Feb 25, 26, 27, 28, 29, Mar 1, 2
-      const ocrResults: OCRResult[] = [
+      const ocrResults = withCalendarStructure([
         createOCRResult('28 Event', 150, 150),
         createOCRResult('29 Task', 200, 150)
-      ];
+      ]);
 
       const result = parseCalendarFromOCR(ocrResults, 2024, 3);
 
@@ -108,11 +108,11 @@ describe('parseCalendarFromOCR - Month Overflow Detection', () => {
       // Week 3 (y=300): [18, 19, 20, 21, 22, 23, 24]
       // Week 4 (y=350): [25, 26, 27, 28, 29, 1, 2] - Feb end + Mar overflow
       // Week 5 (y=400): [3, 4, 5, 6, 7, 8, 9] - More Mar overflow
-      const ocrResults: OCRResult[] = [
+      const ocrResults = withCalendarStructure([
         createOCRResult('29 Review', 250, 350),  // Week 4, position 4
         createOCRResult('1 Plan', 300, 350),     // Week 4, position 5 (after Feb 29)
         createOCRResult('2 Start', 350, 350)     // Week 4, position 6 (after Feb 29)
-      ];
+      ]);
 
       const result = parseCalendarFromOCR(ocrResults, 2024, 2);
 
@@ -125,12 +125,12 @@ describe('parseCalendarFromOCR - Month Overflow Detection', () => {
     it('should detect multiple next month dates', () => {
       // April 2024 ends on Tuesday (April 30)
       // Week 4 will have Apr 30 followed by May 1, 2, 3, 4
-      const ocrResults: OCRResult[] = [
+      const ocrResults = withCalendarStructure([
         createOCRResult('30 Review', 200, 350), // Apr 30 in week 4
         createOCRResult('1 Plan', 300, 350),    // May 1 in week 4, after Apr 30
         createOCRResult('2 Start', 350, 350),   // May 2 in week 4, after Apr 30
         createOCRResult('3 Work', 400, 350)     // May 3 in week 4, after Apr 30
-      ];
+      ]);
 
       const result = parseCalendarFromOCR(ocrResults, 2024, 4);
 
@@ -145,10 +145,10 @@ describe('parseCalendarFromOCR - Month Overflow Detection', () => {
     it('should handle January with December overflow', () => {
       // January 2024 starts on Monday
       // First week: Dec 31, Jan 1, 2, 3, 4, 5, 6
-      const ocrResults: OCRResult[] = [
+      const ocrResults = withCalendarStructure([
         createOCRResult('31 Task', 50, 150),  // Dec 31, 2023
         createOCRResult('1 Work', 100, 150)   // Jan 1, 2024
-      ];
+      ]);
 
       const result = parseCalendarFromOCR(ocrResults, 2024, 1);
 
@@ -159,11 +159,11 @@ describe('parseCalendarFromOCR - Month Overflow Detection', () => {
     it('should handle December with January overflow', () => {
       // December 2024 ends on Tuesday (Dec 31)
       // Week 4: [29, 30, 31, 1, 2, 3, 4] - Dec end + Jan overflow
-      const ocrResults: OCRResult[] = [
+      const ocrResults = withCalendarStructure([
         createOCRResult('31 Review', 200, 350), // Dec 31, 2024 in week 4
         createOCRResult('1 Plan', 300, 350),    // Jan 1, 2025 in week 4, after Dec 31
         createOCRResult('2 Start', 350, 350)    // Jan 2, 2025 in week 4, after Dec 31
-      ];
+      ]);
 
       const result = parseCalendarFromOCR(ocrResults, 2024, 12);
 
@@ -175,12 +175,12 @@ describe('parseCalendarFromOCR - Month Overflow Detection', () => {
     it('should correctly handle year transition with multiple overflow dates', () => {
       // December 2024 with overflow to January 2025
       // Week 5 has more Jan overflow days
-      const ocrResults: OCRResult[] = [
+      const ocrResults = withCalendarStructure([
         createOCRResult('1 Plan', 100, 400),    // Jan 1, 2025 in week 5
         createOCRResult('2 Work', 150, 400),    // Jan 2, 2025 in week 5
         createOCRResult('3 Task', 200, 400),    // Jan 3, 2025 in week 5
         createOCRResult('4 Start', 250, 400)    // Jan 4, 2025 in week 5
-      ];
+      ]);
 
       const result = parseCalendarFromOCR(ocrResults, 2024, 12);
 
@@ -195,13 +195,13 @@ describe('parseCalendarFromOCR - Month Overflow Detection', () => {
       // Week 0 (y=150): [28, 29, 30, 31, 1, 2, 3] - Jan overflow + Feb start
       // Week 2 (y=250): [11, 12, 13, 14, 15, 16, 17] - Feb middle
       // Week 4 (y=350): [25, 26, 27, 28, 29, 1, 2] - Feb end + Mar overflow
-      const ocrResults: OCRResult[] = [
+      const ocrResults = withCalendarStructure([
         createOCRResult('31 Task', 150, 150),   // Week 0: Jan 31 (large number in first week)
         createOCRResult('1 Work', 200, 150),    // Week 0: Feb 1
         createOCRResult('15 Meeting', 200, 250), // Week 2: Feb 15 (current month)
         createOCRResult('29 Review', 250, 350), // Week 4: Feb 29
         createOCRResult('1 Plan', 300, 350)     // Week 4: Mar 1 (after Feb 29)
-      ];
+      ]);
 
       const result = parseCalendarFromOCR(ocrResults, 2024, 2);
 
@@ -215,9 +215,9 @@ describe('parseCalendarFromOCR - Month Overflow Detection', () => {
 
     it('should handle calendar with events on overflow dates', () => {
       // Simulate: "31 Dentist" in first week (Jan 31 event in Feb calendar)
-      const ocrResults: OCRResult[] = [
+      const ocrResults = withCalendarStructure([
         createOCRResult('31 Dentist', 150, 150),
-      ];
+      ]);
 
       const result = parseCalendarFromOCR(ocrResults, 2024, 2);
 
@@ -236,9 +236,9 @@ describe('parseCalendarFromOCR - Month Overflow Detection', () => {
     });
 
     it('should keep low day numbers in current month before cutoff', () => {
-      const ocrResults: OCRResult[] = [
+      const ocrResults = withCalendarStructure([
         createOCRResult('2 Task', 100, 200)
-      ];
+      ]);
 
       const result = parseCalendarFromOCR(ocrResults, 2024, 2);
 
@@ -247,10 +247,10 @@ describe('parseCalendarFromOCR - Month Overflow Detection', () => {
     });
 
     it('should handle non-date text', () => {
-      const ocrResults: OCRResult[] = [
+      const ocrResults = withCalendarStructure([
         createOCRResult('Meeting at 3pm', 200, 200),
         createOCRResult('Lunch', 300, 200)
-      ];
+      ]);
 
       const result = parseCalendarFromOCR(ocrResults, 2024, 2);
       expect(result.events).toHaveLength(0);
@@ -259,9 +259,9 @@ describe('parseCalendarFromOCR - Month Overflow Detection', () => {
     it('should handle single-digit dates in last week correctly', () => {
       // May 2024 ends on Friday (May 31)
       // Week 4: [26, 27, 28, 29, 30, 31, 1] - May end + Jun 1 overflow
-      const ocrResults: OCRResult[] = [
+      const ocrResults = withCalendarStructure([
         createOCRResult('1 Start', 350, 350) // Jun 1 in week 4, after May 31
-      ];
+      ]);
 
       const result = parseCalendarFromOCR(ocrResults, 2024, 5);
 
@@ -271,10 +271,10 @@ describe('parseCalendarFromOCR - Month Overflow Detection', () => {
     it('should handle 30-day months correctly', () => {
       // April 2024 (30 days)
       // Week 4: [28, 29, 30, 1, 2, 3, 4] - Apr end + May overflow
-      const ocrResults: OCRResult[] = [
+      const ocrResults = withCalendarStructure([
         createOCRResult('30 End', 200, 350), // Apr 30 in week 4
         createOCRResult('1 Start', 300, 350)   // May 1 in week 4, after Apr 30
-      ];
+      ]);
 
       const result = parseCalendarFromOCR(ocrResults, 2024, 4);
 

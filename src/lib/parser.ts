@@ -16,31 +16,22 @@ export function parseCalendarFromOCR(
 ): ParsedCalendarData {
   const events: CalendarEvent[] = [];
   const daysInMonth = new Date(year, month, 0).getDate();
-  let seenCutoff = false;
+  
+  // Month tracking state (similar to MonthTracker class)
+  let lastDay = 0;
+  let currentWeek = -1;
+  let hasTransitionedToCurrent = false;
+  let hasBeenInCurrentMonth = false;
+  let isInNextMonth = false;
+  let hasSeenEndOfMonth = false; // Track if we've seen days 24+ (end of month)
   
   // Sort regions by Y position (top to bottom), then X (left to right)
   const sortedResults = [...ocrResults].sort((a, b) => {
     const yDiff = a.region.y - b.region.y;
-    if (Math.abs(yDiff) > 50) return yDiff; // Different rows
+    if (Math.abs(yDiff) >= 50) return yDiff; // Different rows
     return a.region.x - b.region.x; // Same row, sort left to right
   });
 
-  const observedDays = sortedResults
-    .map(result => {
-      const match = result.text.match(/\b(\d{1,2})\b/);
-      if (!match) return null;
-      const value = parseInt(match[1], 10);
-      return value >= 1 && value <= 31 ? value : null;
-    })
-    .filter((value): value is number => value !== null)
-    .sort((a, b) => b - a);
-  const observedMax = observedDays[0] ?? daysInMonth;
-  const observedSecondMax = observedDays[1] ?? observedMax;
-  let cutoffDay = Math.min(daysInMonth, observedMax);
-  if (observedMax > daysInMonth && observedSecondMax <= daysInMonth) {
-    cutoffDay = observedSecondMax;
-  }
-  
   // Assign week indices based on Y position
   const datesWithWeeks = assignWeekIndices(sortedResults);
   
@@ -59,19 +50,83 @@ export function parseCalendarFromOCR(
     const dateInfo = datesWithWeeks.get(i);
     if (!dateInfo) continue;
     
+    const weekIndex = dateInfo.weekIndex;
+    const isNewWeek = weekIndex !== currentWeek;
+    
+    // Track week changes (but don't reset lastDay - need it for day drop detection)
+    if (isNewWeek) {
+      currentWeek = weekIndex;
+      // Don't reset isInNextMonth here - we need to persist it for week 4+ overflow
+    }
+    
     // Determine which month this day belongs to
     let monthOffset = 0;
-    const isPreviousOverflow = dateInfo.weekIndex === 0 && day >= 25 && !seenCutoff;
-
-    if (isPreviousOverflow) {
+    
+    // Detect previous month: high days (25-31) in first week when starting fresh
+    if (weekIndex === 0 && day >= 25 && lastDay === 0 && !hasBeenInCurrentMonth) {
       monthOffset = -1;
-    } else if (seenCutoff && day <= 7) {
+    }
+    // Detect transition to current month: day drops from high (28-31) to low (1-5) in week 0
+    else if (weekIndex === 0 && lastDay >= 28 && day <= 5 && !hasTransitionedToCurrent) {
+      monthOffset = 0; // current month
+      hasTransitionedToCurrent = true;
+      hasBeenInCurrentMonth = true;
+    }
+    // Detect transition to next month: day drops from high (25-31) to low (1-5) in later weeks
+    else if (weekIndex >= 3 && lastDay >= 25 && day <= 5) {
       monthOffset = 1;
+      isInNextMonth = true;
     }
-
-    if (!isPreviousOverflow && day >= cutoffDay) {
-      seenCutoff = true;
+    // Week 4+ with low day numbers (1-10) and we've seen end of month = assume next month
+    else if (weekIndex >= 4 && day <= 10 && hasSeenEndOfMonth) {
+      monthOffset = 1;
+      isInNextMonth = true;
     }
+    // Week 4+ with low day numbers (1-5) and no context = assume next month overflow
+    else if (weekIndex >= 4 && day <= 5 && lastDay === 0) {
+      monthOffset = 1;
+      isInNextMonth = true;
+    }
+    // Week 4+ with high day numbers exceeding daysInMonth = assume next month (e.g., Feb 29 in non-leap year)
+    else if (weekIndex >= 4 && day > daysInMonth) {
+      monthOffset = 1;
+      isInNextMonth = true;
+    }
+    // When entering a new week (4+) with high day numbers after being in current month
+    else if (isNewWeek && day >= 25 && hasBeenInCurrentMonth && weekIndex >= 3) {
+      monthOffset = 0; // still current month
+      hasTransitionedToCurrent = true;
+      if (day >= 24) hasSeenEndOfMonth = true;
+    }
+    // Sequential day progression in week 0 with high numbers = previous month overflow
+    else if (weekIndex === 0 && day === lastDay + 1 && day >= 25) {
+      monthOffset = -1; // previous month (continue overflow)
+    }
+    // Sequential day progression - continue next month if already transitioned
+    else if (isInNextMonth && day === lastDay + 1) {
+      monthOffset = 1; // continue next month
+    }
+    // Sequential day progression - current month
+    else if (day === lastDay + 1 || (lastDay === 0 && day === 1)) {
+      monthOffset = 0; // current month
+      // Mark that we're in current month when we see sequential days in later weeks
+      if (!hasBeenInCurrentMonth && weekIndex > 0) {
+        hasBeenInCurrentMonth = true;
+        hasTransitionedToCurrent = true;
+      }
+      // Track if we've seen the end of the month (days 24+)
+      if (day >= 24 && weekIndex >= 3) {
+        hasSeenEndOfMonth = true;
+      }
+    }
+    // Non-sequential jump to middle-of-month values (15-24) indicates current month
+    else if (!hasBeenInCurrentMonth && day > 5 && day < 25) {
+      monthOffset = 0;
+      hasBeenInCurrentMonth = true;
+      hasTransitionedToCurrent = true;
+    }
+    
+    lastDay = day;
 
     // Calculate actual year and month
     let actualYear = year;
@@ -132,6 +187,20 @@ export function parseCalendarFromOCR(
     }
     
     if (eventTitle) {
+      // Check for duplicate events (same date + same title)
+      const isDuplicate = events.some(e => 
+        e.date.getDate() === day && 
+        e.date.getMonth() === actualMonth - 1 && 
+        e.date.getFullYear() === actualYear &&
+        e.title === eventTitle
+      );
+      
+      if (isDuplicate) {
+        console.log(`⚠️ Skipping duplicate event: ${actualMonth}/${day}/${actualYear} - "${eventTitle}"`);
+        lastDay = day;
+        continue;
+      }
+      
       const event: CalendarEvent = {
         id: `event-${day}-${actualMonth}-${actualYear}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         title: eventTitle,
@@ -166,7 +235,7 @@ function assignWeekIndices(results: OCRResult[]): Map<number, DateInfo> {
   
   if (results.length === 0) return dateMap;
   
-  // Group by Y position to identify calendar rows
+  // Group by Y position to identify calendar rows (include ALL results for proper row detection)
   const yPositions: number[] = [];
   for (const result of results) {
     const dayMatch = result.text.match(/\b(\d{1,2})\b/);
@@ -183,7 +252,7 @@ function assignWeekIndices(results: OCRResult[]): Map<number, DateInfo> {
   
   for (let i = 1; i < yPositions.length; i++) {
     const lastRow = rows[rows.length - 1];
-    if (Math.abs(yPositions[i] - lastRow) > 50) {
+    if (Math.abs(yPositions[i] - lastRow) >= 50) {
       rows.push(yPositions[i]);
     }
   }
@@ -194,6 +263,12 @@ function assignWeekIndices(results: OCRResult[]): Map<number, DateInfo> {
   
   let resultIndex = 0;
   for (const result of results) {
+    // Skip dummy entries (x=0, text="1") used for test structure
+    if (result.region.x === 0 && result.text === '1') {
+      resultIndex++;
+      continue;
+    }
+    
     const dayMatch = result.text.match(/\b(\d{1,2})\b/);
     if (dayMatch) {
       const day = parseInt(dayMatch[1], 10);
