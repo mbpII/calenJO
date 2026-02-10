@@ -13,8 +13,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Calendar to .ics Converter",
+  title: "CalenJO - Calendar to .ics Converter",
   description: "Convert calendar images to Apple Calendar format",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({
