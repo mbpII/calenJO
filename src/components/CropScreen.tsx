@@ -35,8 +35,8 @@ export const CropScreen: React.FC<CropScreenProps> = ({
         imageSmoothingQuality: 'high'
       });
       
-      // Convert to data URL
-      const croppedImage = canvas.toDataURL('image/jpeg', 0.9);
+      // Convert to data URL - use PNG to preserve quality and colors
+      const croppedImage = canvas.toDataURL('image/png');
       onCropComplete(croppedImage);
     } catch (error) {
       console.error('Error cropping image:', error);
