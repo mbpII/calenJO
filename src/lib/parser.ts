@@ -1,59 +1,6 @@
 import { CalendarEvent, ParsedCalendarData, CalendarType } from '@/types/calendar';
 import { OCRResult } from './ocr';
 
-// Month context enum for tracking which month a date belongs to
-enum MonthContext {
-  PREVIOUS = 'previous',
-  CURRENT = 'current',
-  NEXT = 'next'
-}
-
-// Simple month tracker - detects month transitions based on day progression
-class MonthTracker {
-  private lastDay: number = 0;
-  private context: MonthContext = MonthContext.CURRENT;
-  private hasTransitionedToCurrent: boolean = false;
-  private currentWeek: number = -1;
-  
-  detectMonth(day: number, weekIndex: number): { context: MonthContext; monthOffset: number } {
-    // Reset when entering a new week
-    if (weekIndex !== this.currentWeek) {
-      this.currentWeek = weekIndex;
-      this.lastDay = 0;
-    }
-    
-    // Detect previous month: high days (25-31) at the start
-    if (weekIndex === 0 && day >= 25 && this.lastDay === 0) {
-      this.context = MonthContext.PREVIOUS;
-    }
-    // Detect transition to current month: day drops from high (28-31) to low (1-5)
-    else if (this.lastDay >= 28 && day <= 5 && !this.hasTransitionedToCurrent) {
-      this.context = MonthContext.CURRENT;
-      this.hasTransitionedToCurrent = true;
-    }
-    // Detect transition to next month: day drops in later weeks after we've been in current month
-    else if (this.lastDay >= 25 && day <= 5 && weekIndex >= 3 && this.hasTransitionedToCurrent) {
-      this.context = MonthContext.NEXT;
-    }
-    
-    this.lastDay = day;
-    
-    // Convert context to month offset
-    let monthOffset = 0;
-    if (this.context === MonthContext.PREVIOUS) monthOffset = -1;
-    else if (this.context === MonthContext.NEXT) monthOffset = 1;
-    
-    return { context: this.context, monthOffset };
-  }
-  
-  reset(): void {
-    this.lastDay = 0;
-    this.context = MonthContext.CURRENT;
-    this.hasTransitionedToCurrent = false;
-    this.currentWeek = -1;
-  }
-}
-
 interface DateInfo {
   day: number;
   weekIndex: number;
@@ -68,7 +15,8 @@ export function parseCalendarFromOCR(
   calendarType: CalendarType = 'standard'
 ): ParsedCalendarData {
   const events: CalendarEvent[] = [];
-  const monthTracker = new MonthTracker();
+  const daysInMonth = new Date(year, month, 0).getDate();
+  let seenCutoff = false;
   
   // Sort regions by Y position (top to bottom), then X (left to right)
   const sortedResults = [...ocrResults].sort((a, b) => {
@@ -76,13 +24,25 @@ export function parseCalendarFromOCR(
     if (Math.abs(yDiff) > 50) return yDiff; // Different rows
     return a.region.x - b.region.x; // Same row, sort left to right
   });
+
+  const observedDays = sortedResults
+    .map(result => {
+      const match = result.text.match(/\b(\d{1,2})\b/);
+      if (!match) return null;
+      const value = parseInt(match[1], 10);
+      return value >= 1 && value <= 31 ? value : null;
+    })
+    .filter((value): value is number => value !== null)
+    .sort((a, b) => b - a);
+  const observedMax = observedDays[0] ?? daysInMonth;
+  const observedSecondMax = observedDays[1] ?? observedMax;
+  let cutoffDay = Math.min(daysInMonth, observedMax);
+  if (observedMax > daysInMonth && observedSecondMax <= daysInMonth) {
+    cutoffDay = observedSecondMax;
+  }
   
   // Assign week indices based on Y position
   const datesWithWeeks = assignWeekIndices(sortedResults);
-  
-  // Track month transitions as we process each date
-  let currentMonthOffset = 0;
-  let lastWeekIndex = -1;
   
   // Extract date numbers from text
   for (let i = 0; i < sortedResults.length; i++) {
@@ -99,13 +59,23 @@ export function parseCalendarFromOCR(
     const dateInfo = datesWithWeeks.get(i);
     if (!dateInfo) continue;
     
-    // Detect which month this day belongs to
-    const { monthOffset } = monthTracker.detectMonth(day, dateInfo.weekIndex);
-    currentMonthOffset = monthOffset;
-    
+    // Determine which month this day belongs to
+    let monthOffset = 0;
+    const isPreviousOverflow = dateInfo.weekIndex === 0 && day >= 25 && !seenCutoff;
+
+    if (isPreviousOverflow) {
+      monthOffset = -1;
+    } else if (seenCutoff && day <= 7) {
+      monthOffset = 1;
+    }
+
+    if (!isPreviousOverflow && day >= cutoffDay) {
+      seenCutoff = true;
+    }
+
     // Calculate actual year and month
     let actualYear = year;
-    let actualMonth = month + currentMonthOffset;
+    let actualMonth = month + monthOffset;
     
     // Handle year boundaries
     if (actualMonth === 0) {

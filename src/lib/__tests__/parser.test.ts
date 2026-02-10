@@ -235,6 +235,17 @@ describe('parseCalendarFromOCR - Month Overflow Detection', () => {
       expect(result.month).toBe(2);
     });
 
+    it('should keep low day numbers in current month before cutoff', () => {
+      const ocrResults: OCRResult[] = [
+        createOCRResult('2 Task', 100, 200)
+      ];
+
+      const result = parseCalendarFromOCR(ocrResults, 2024, 2);
+
+      expect(result.events).toHaveLength(1);
+      expect(result.events[0].date).toEqual(new Date(2024, 1, 2));
+    });
+
     it('should handle non-date text', () => {
       const ocrResults: OCRResult[] = [
         createOCRResult('Meeting at 3pm', 200, 200),
