@@ -200,9 +200,6 @@ export const CropScreen: React.FC<CropScreenProps> = ({
             toggleDragModeOnDblclick={true}
             minContainerWidth={200}
             minContainerHeight={200}
-            ready={() => {
-              console.log('Cropper ready');
-            }}
           />
         </div>
       </div>

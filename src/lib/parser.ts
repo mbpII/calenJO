@@ -148,7 +148,6 @@ export function parseCalendarFromOCR(
     const afterDate = text.replace(/\b\d{1,2}\b/, '').trim();
     if (afterDate.length > 1) {
       eventTitle = cleanEventText(afterDate);
-      console.log(`📝 Found event text in same region: "${eventTitle}" from "${text}"`);
     }
     
     // In standard mode: use smarter proximity check
@@ -169,7 +168,6 @@ export function parseCalendarFromOCR(
       
       if ((isSameRow || isDirectlyBelow) && isNearbyX && isNotJustANumber) {
         eventTitle = cleanEventText(nextText);
-        console.log(`📝 Found event text in nearby region: "${eventTitle}"`);
       }
     }
     
@@ -196,7 +194,6 @@ export function parseCalendarFromOCR(
       );
       
       if (isDuplicate) {
-        console.log(`⚠️ Skipping duplicate event: ${actualMonth}/${day}/${actualYear} - "${eventTitle}"`);
         lastDay = day;
         continue;
       }
@@ -217,9 +214,6 @@ export function parseCalendarFromOCR(
       }
       
       events.push(event);
-      
-      // Log for debugging
-      console.log(`📅 Detected: ${actualMonth}/${day}/${actualYear} - "${eventTitle}" (${monthOffset > 0 ? 'next' : monthOffset < 0 ? 'prev' : 'current'} month)`);
     }
   }
   
