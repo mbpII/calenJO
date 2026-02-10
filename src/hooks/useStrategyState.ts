@@ -6,8 +6,8 @@ import { StrategyType } from '@/lib/strategies';
 const STORAGE_KEY = 'calcSync-strategy';
 
 export function useStrategyState(): [StrategyType, (strategy: StrategyType) => void] {
-  // Default to 'canvas' for SSR to avoid hydration mismatch
-  const [strategy, setStrategyState] = useState<StrategyType>('canvas');
+  // Default to 'opencv' for better accuracy (robust detection)
+  const [strategy, setStrategyState] = useState<StrategyType>('opencv');
   const [isHydrated, setIsHydrated] = useState(false);
 
   // Read from sessionStorage after hydration

@@ -16,7 +16,7 @@ import { CalendarEvent, ProcessingState, CalendarType } from '@/types/calendar';
 
 export const CalendarProcessor: React.FC = () => {
   const [selectedStrategy, setSelectedStrategy] = useStrategyState();
-  const [selectedCalendarType, setSelectedCalendarType] = useState<CalendarType>('standard');
+  const [selectedCalendarType, setSelectedCalendarType] = useState<CalendarType>('jojo');
   const [processingState, setProcessingState] = useState<ProcessingState>({
     status: 'idle',
     progress: 0,
@@ -149,9 +149,7 @@ export const CalendarProcessor: React.FC = () => {
         onImageUpload={handleImageUpload}
         onClear={handleClear}
         selectedStrategy={selectedStrategy}
-        onStrategyChange={setSelectedStrategy}
         selectedCalendarType={selectedCalendarType}
-        onCalendarTypeChange={setSelectedCalendarType}
         isProcessing={isProcessing}
       />
 

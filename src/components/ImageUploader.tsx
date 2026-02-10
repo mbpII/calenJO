@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { ColorDetectionFactory, StrategyType } from '@/lib';
+import { StrategyType } from '@/lib';
 import { CalendarType } from '@/types/calendar';
 import { CropScreen } from './CropScreen';
 
@@ -9,9 +9,7 @@ interface ImageUploaderProps {
   onImageUpload: (file: File, strategy: StrategyType, calendarType: CalendarType, imagePreview: string) => void | Promise<void>;
   onClear: () => void;
   selectedStrategy: StrategyType;
-  onStrategyChange: (strategy: StrategyType) => void;
   selectedCalendarType: CalendarType;
-  onCalendarTypeChange: (calendarType: CalendarType) => void;
   isProcessing: boolean;
 }
 
@@ -19,9 +17,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   onImageUpload,
   onClear,
   selectedStrategy,
-  onStrategyChange,
   selectedCalendarType,
-  onCalendarTypeChange,
   isProcessing
 }) => {
   const [dragActive, setDragActive] = useState(false);
@@ -104,8 +100,6 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     onClear();
   };
 
-  const strategies = ColorDetectionFactory.getAllStrategies();
-
   return (
     <div className="space-y-6">
       {/* Main Upload Card */}
@@ -119,55 +113,6 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
           <h2 className="text-2xl font-bold text-slate-800">Upload Calendar Image</h2>
         </div>
         
-        {/* Settings Section */}
-        <div className="grid md:grid-cols-2 gap-4 mb-6">
-          {/* Strategy Selector - Only in dev mode */}
-          {process.env.NODE_ENV === 'development' && (
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-600 flex items-center gap-2">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                Detection Strategy
-              </label>
-              <select
-                value={selectedStrategy}
-                onChange={(e) => onStrategyChange(e.target.value as StrategyType)}
-                disabled={isProcessing}
-                className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-sm text-slate-900 appearance-none cursor-pointer"
-                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
-              >
-                {strategies.map((strategy) => (
-                  <option key={strategy.type} value={strategy.type} className="text-slate-900">
-                    {strategy.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Calendar Type Selector */}
-          <div className={`space-y-2 ${process.env.NODE_ENV === 'development' ? '' : 'md:col-span-2'}`}>
-            <label className="text-sm font-medium text-slate-600 flex items-center gap-2">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              Calendar Type
-            </label>
-            <select
-              value={selectedCalendarType}
-              onChange={(e) => onCalendarTypeChange(e.target.value as CalendarType)}
-              disabled={isProcessing}
-              className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-sm text-slate-900 appearance-none cursor-pointer"
-              style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
-            >
-              <option value="standard" className="text-slate-900">Standard Calendar</option>
-              <option value="jojo" className="text-slate-900">Jojo Mode (Shift Tracking)</option>
-            </select>
-          </div>
-        </div>
-
         {/* Drag and Drop Area */}
         <div
           onDragEnter={handleDrag}
