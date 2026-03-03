@@ -3,15 +3,27 @@
 import React, { useState, useCallback } from 'react';
 import { StrategyType } from '@/lib';
 import { CalendarType } from '@/types/calendar';
+import { usePersistentState } from '@/hooks/usePersistentState';
 import { CropScreen } from './CropScreen';
+import { 
+  Button,
+  CalendarImage, 
+  ShiftMessages, 
+  ProcessCalendar, 
+  ProcessScreenshot,
+  ProcessPastedMessages,
+  Clear 
+} from './buttons';
 
 interface ImageUploaderProps {
   onImageUpload: (file: File, strategy: StrategyType, calendarType: CalendarType, imagePreview: string) => void | Promise<void>;
-  onShiftScreenshotUpload: (file: File) => void | Promise<void>;
+  onShiftScreenshotUpload: (files: File[]) => void | Promise<void>;
   onShiftTextSubmit: (text: string) => void;
   onClear: () => void;
   selectedStrategy: StrategyType;
+  onStrategyChange: (strategy: StrategyType) => void;
   selectedCalendarType: CalendarType;
+  onCalendarTypeChange: (type: CalendarType) => void;
   isProcessing: boolean;
 }
 
@@ -21,35 +33,53 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   onShiftTextSubmit,
   onClear,
   selectedStrategy,
+  onStrategyChange,
   selectedCalendarType,
+  onCalendarTypeChange,
   isProcessing
 }) => {
-  const [inputMode, setInputMode] = useState<'calendar' | 'shift'>('calendar');
+  const [inputMode, setInputMode] = usePersistentState<'calendar' | 'shift'>('calenjo-input-mode', 'calendar');
   const [dragActive, setDragActive] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [shiftFiles, setShiftFiles] = useState<File[]>([]);
   const [showCropScreen, setShowCropScreen] = useState(false);
   const [originalPreview, setOriginalPreview] = useState<string | null>(null);
   const [shiftText, setShiftText] = useState('');
 
-  const handleFile = useCallback((file: File) => {
-    if (!file.type.startsWith('image/')) {
-      alert('Please upload an image file');
+  const handleFiles = useCallback((incomingFiles: File[]) => {
+    const imageFiles = incomingFiles.filter((incomingFile) => incomingFile.type.startsWith('image/'));
+    if (imageFiles.length === 0) {
+      alert('Please upload at least one image file');
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const result = e.target?.result as string;
-      setOriginalPreview(result);
-      setFile(file);
-      if (inputMode === 'calendar') {
+    if (inputMode === 'calendar') {
+      const firstFile = imageFiles[0];
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        setOriginalPreview(result);
+        setFile(firstFile);
         setShowCropScreen(true);
-      } else {
-        setPreview(result);
+      };
+      reader.readAsDataURL(firstFile);
+      return;
+    }
+
+    setShiftFiles((previousFiles) => {
+      const fileMap = new Map<string, File>();
+
+      for (const existingFile of previousFiles) {
+        fileMap.set(`${existingFile.name}-${existingFile.size}-${existingFile.lastModified}`, existingFile);
       }
-    };
-    reader.readAsDataURL(file);
+
+      for (const incomingFile of imageFiles) {
+        fileMap.set(`${incomingFile.name}-${incomingFile.size}-${incomingFile.lastModified}`, incomingFile);
+      }
+
+      return Array.from(fileMap.values());
+    });
   }, [inputMode]);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
@@ -67,17 +97,18 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     e.stopPropagation();
     setDragActive(false);
 
-    const files = e.dataTransfer.files;
-    if (files && files[0]) {
-      handleFile(files[0]);
+    const files = Array.from(e.dataTransfer.files || []);
+    if (files.length > 0) {
+      handleFiles(files);
     }
-  }, [handleFile]);
+  }, [handleFiles]);
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (files && files[0]) {
-      handleFile(files[0]);
+    if (files && files.length > 0) {
+      handleFiles(Array.from(files));
     }
+    e.target.value = '';
   };
 
   const dataUrlToFile = (dataUrl: string, filename: string): File => {
@@ -116,8 +147,8 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       onImageUpload(file, selectedStrategy, selectedCalendarType, preview);
     }
 
-    if (inputMode === 'shift' && file) {
-      onShiftScreenshotUpload(file);
+    if (inputMode === 'shift' && shiftFiles.length > 0) {
+      onShiftScreenshotUpload(shiftFiles);
     }
   };
 
@@ -130,15 +161,28 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   const handleClear = () => {
     setPreview(null);
     setFile(null);
+    setShiftFiles([]);
     setOriginalPreview(null);
     setShowCropScreen(false);
     setShiftText('');
     onClear();
   };
 
+  const handleModeChange = (mode: 'calendar' | 'shift') => {
+    setInputMode(mode);
+    setPreview(null);
+    setFile(null);
+    setShiftFiles([]);
+    setShowCropScreen(false);
+    setOriginalPreview(null);
+    if (mode === 'calendar') {
+      setShiftText('');
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <div className="glass rounded-2xl shadow-xl p-8 card-hover">
+      <div className="bg-white rounded-2xl shadow-xl p-8 card-hover">
         <div className="flex items-center gap-3 mb-6">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
             <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -149,42 +193,45 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         </div>
 
         <div className="mb-6 p-1 bg-slate-100 rounded-xl inline-flex gap-1">
-          <button
-            type="button"
-            onClick={() => {
-              setInputMode('calendar');
-              setPreview(null);
-              setFile(null);
-              setShowCropScreen(false);
-              setOriginalPreview(null);
-              setShiftText('');
-            }}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
-              inputMode === 'calendar'
-                ? 'bg-white text-indigo-700 shadow'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Calendar Image
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setInputMode('shift');
-              setPreview(null);
-              setFile(null);
-              setShowCropScreen(false);
-              setOriginalPreview(null);
-            }}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
-              inputMode === 'shift'
-                ? 'bg-white text-indigo-700 shadow'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Shift Messages
-          </button>
+          <CalendarImage 
+            isActive={inputMode === 'calendar'} 
+            onClick={() => handleModeChange('calendar')} 
+          />
+          <ShiftMessages 
+            isActive={inputMode === 'shift'} 
+            onClick={() => handleModeChange('shift')} 
+          />
         </div>
+
+        {inputMode === 'calendar' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
+            <label className="block">
+              <span className="block text-xs font-semibold uppercase tracking-wide text-slate-600 mb-1">Detection Strategy</span>
+              <select
+                value={selectedStrategy}
+                onChange={(e) => onStrategyChange(e.target.value as StrategyType)}
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                disabled={isProcessing}
+              >
+                <option value="canvas">Canvas (fast)</option>
+                <option value="opencv">OpenCV (robust)</option>
+              </select>
+            </label>
+
+            <label className="block">
+              <span className="block text-xs font-semibold uppercase tracking-wide text-slate-600 mb-1">Calendar Parse Mode</span>
+              <select
+                value={selectedCalendarType}
+                onChange={(e) => onCalendarTypeChange(e.target.value as CalendarType)}
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                disabled={isProcessing}
+              >
+                <option value="jojo">Shift Mode (red dates)</option>
+                <option value="standard">Standard Mode</option>
+              </select>
+            </label>
+          </div>
+        )}
         
         <div
           onDragEnter={handleDrag}
@@ -203,6 +250,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
           <input
             type="file"
             accept="image/*"
+            multiple={inputMode === 'shift'}
             onChange={handleFileInput}
             disabled={isProcessing}
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
@@ -226,15 +274,26 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
             </div>
             <div>
               <span className="font-semibold text-indigo-600">Click to upload</span>
-              <span className="text-slate-500"> or drag and drop</span>
+              <span className="text-slate-700"> or drag and drop</span>
             </div>
-            <p className="text-sm text-slate-400">
+            <p className="text-sm text-slate-600">
               {inputMode === 'calendar'
                 ? 'Upload a calendar screenshot (PNG, JPG, GIF)'
-                : 'Upload a text message screenshot from mobile or desktop'}
+                : 'Upload one or more message screenshots from mobile or desktop'}
             </p>
           </div>
         </div>
+
+        {inputMode === 'shift' && shiftFiles.length > 0 && (
+          <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3">
+            <p className="text-sm font-semibold text-slate-800">
+              {shiftFiles.length} screenshot{shiftFiles.length === 1 ? '' : 's'} selected
+            </p>
+            <p className="text-xs text-slate-600 mt-1">
+              Files are deduplicated by name, size, and modified time.
+            </p>
+          </div>
+        )}
 
         {inputMode === 'shift' && (
           <div className="mt-6">
@@ -246,7 +305,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
               value={shiftText}
               onChange={(e) => setShiftText(e.target.value)}
               placeholder="You have successfully added a shift: Thu, Mar 5, 2026 from 15:30 to 18:00..."
-              className="w-full min-h-36 rounded-xl border border-slate-300 p-3 text-sm text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full min-h-36 rounded-xl border border-slate-300 bg-white px-3 py-3 text-sm leading-6 text-slate-900 placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               disabled={isProcessing}
             />
           </div>
@@ -272,53 +331,34 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
             </div>
             
             <div className="flex gap-3">
-              <button
-                onClick={handleProcess}
-                disabled={isProcessing}
-                className="flex-1 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold shadow-lg shadow-indigo-200"
-              >
-                {isProcessing ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                    Processing...
-                  </span>
-                ) : (
-                  <span className="flex items-center justify-center gap-2">
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                    {inputMode === 'calendar' ? 'Process Calendar' : 'Process Screenshot'}
-                  </span>
-                )}
-              </button>
-              <button
-                onClick={handleClear}
-                disabled={isProcessing}
-                className="px-6 py-3 bg-white text-slate-600 border border-slate-300 rounded-xl hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
-              >
-                <span className="flex items-center gap-2">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                  Clear
-                </span>
-              </button>
+              <ProcessCalendar 
+                isProcessing={isProcessing} 
+                onClick={handleProcess} 
+              />
+              <Clear 
+                isProcessing={isProcessing} 
+                onClick={handleClear} 
+              />
             </div>
           </div>
         )}
 
         {inputMode === 'shift' && shiftText.trim().length > 0 && (
           <div className="mt-4">
-            <button
-              onClick={handleProcessShiftText}
-              disabled={isProcessing}
-              className="w-full px-6 py-3 bg-gradient-to-r from-teal-600 to-cyan-600 text-white rounded-xl hover:from-teal-700 hover:to-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold shadow-lg shadow-cyan-200"
-            >
-              Process Pasted Messages
-            </button>
+            <ProcessPastedMessages 
+              isProcessing={isProcessing} 
+              onClick={handleProcessShiftText} 
+            />
+          </div>
+        )}
+
+        {inputMode === 'shift' && shiftFiles.length > 0 && (
+          <div className="mt-4">
+            <ProcessScreenshot 
+              isProcessing={isProcessing}
+              count={shiftFiles.length}
+              onClick={handleProcess}
+            />
           </div>
         )}
       </div>
