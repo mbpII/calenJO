@@ -7,6 +7,8 @@ import { CropScreen } from './CropScreen';
 
 interface ImageUploaderProps {
   onImageUpload: (file: File, strategy: StrategyType, calendarType: CalendarType, imagePreview: string) => void | Promise<void>;
+  onShiftScreenshotUpload: (file: File) => void | Promise<void>;
+  onShiftTextSubmit: (text: string) => void;
   onClear: () => void;
   selectedStrategy: StrategyType;
   selectedCalendarType: CalendarType;
@@ -15,16 +17,20 @@ interface ImageUploaderProps {
 
 export const ImageUploader: React.FC<ImageUploaderProps> = ({
   onImageUpload,
+  onShiftScreenshotUpload,
+  onShiftTextSubmit,
   onClear,
   selectedStrategy,
   selectedCalendarType,
   isProcessing
 }) => {
+  const [inputMode, setInputMode] = useState<'calendar' | 'shift'>('calendar');
   const [dragActive, setDragActive] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [showCropScreen, setShowCropScreen] = useState(false);
   const [originalPreview, setOriginalPreview] = useState<string | null>(null);
+  const [shiftText, setShiftText] = useState('');
 
   const handleFile = useCallback((file: File) => {
     if (!file.type.startsWith('image/')) {
@@ -37,10 +43,14 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       const result = e.target?.result as string;
       setOriginalPreview(result);
       setFile(file);
-      setShowCropScreen(true); // Show crop screen after file upload
+      if (inputMode === 'calendar') {
+        setShowCropScreen(true);
+      } else {
+        setPreview(result);
+      }
     };
     reader.readAsDataURL(file);
-  }, []);
+  }, [inputMode]);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -70,10 +80,25 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     }
   };
 
+  const dataUrlToFile = (dataUrl: string, filename: string): File => {
+    const [header, data] = dataUrl.split(',');
+    const mimeMatch = header.match(/:(.*?);/);
+    const mime = mimeMatch ? mimeMatch[1] : 'image/png';
+    const binary = atob(data);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return new File([bytes], filename, { type: mime });
+  };
+
   const handleCropComplete = useCallback((croppedImage: string) => {
+    const filename = file?.name ? `cropped-${file.name}` : 'cropped-image.png';
+    const croppedFile = dataUrlToFile(croppedImage, filename);
+    setFile(croppedFile);
     setPreview(croppedImage);
     setShowCropScreen(false);
-  }, []);
+  }, [file]);
 
   const handleSkipCrop = useCallback(() => {
     setPreview(originalPreview);
@@ -87,8 +112,18 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   }, []);
 
   const handleProcess = () => {
-    if (file && preview) {
+    if (inputMode === 'calendar' && file && preview) {
       onImageUpload(file, selectedStrategy, selectedCalendarType, preview);
+    }
+
+    if (inputMode === 'shift' && file) {
+      onShiftScreenshotUpload(file);
+    }
+  };
+
+  const handleProcessShiftText = () => {
+    if (shiftText.trim()) {
+      onShiftTextSubmit(shiftText.trim());
     }
   };
 
@@ -97,12 +132,12 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     setFile(null);
     setOriginalPreview(null);
     setShowCropScreen(false);
+    setShiftText('');
     onClear();
   };
 
   return (
     <div className="space-y-6">
-      {/* Main Upload Card */}
       <div className="glass rounded-2xl shadow-xl p-8 card-hover">
         <div className="flex items-center gap-3 mb-6">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
@@ -110,10 +145,47 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-slate-800">Upload Calendar Image</h2>
+          <h2 className="text-2xl font-bold text-slate-800">Import Source</h2>
+        </div>
+
+        <div className="mb-6 p-1 bg-slate-100 rounded-xl inline-flex gap-1">
+          <button
+            type="button"
+            onClick={() => {
+              setInputMode('calendar');
+              setPreview(null);
+              setFile(null);
+              setShowCropScreen(false);
+              setOriginalPreview(null);
+              setShiftText('');
+            }}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+              inputMode === 'calendar'
+                ? 'bg-white text-indigo-700 shadow'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Calendar Image
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setInputMode('shift');
+              setPreview(null);
+              setFile(null);
+              setShowCropScreen(false);
+              setOriginalPreview(null);
+            }}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+              inputMode === 'shift'
+                ? 'bg-white text-indigo-700 shadow'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Shift Messages
+          </button>
         </div>
         
-        {/* Drag and Drop Area */}
         <div
           onDragEnter={handleDrag}
           onDragLeave={handleDrag}
@@ -157,12 +229,29 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
               <span className="text-slate-500"> or drag and drop</span>
             </div>
             <p className="text-sm text-slate-400">
-              PNG, JPG, GIF up to 10MB
+              {inputMode === 'calendar'
+                ? 'Upload a calendar screenshot (PNG, JPG, GIF)'
+                : 'Upload a text message screenshot from mobile or desktop'}
             </p>
           </div>
         </div>
 
-        {/* Image Preview */}
+        {inputMode === 'shift' && (
+          <div className="mt-6">
+            <label className="block text-sm font-semibold text-slate-700 mb-2" htmlFor="shift-text-input">
+              Or paste shift messages directly
+            </label>
+            <textarea
+              id="shift-text-input"
+              value={shiftText}
+              onChange={(e) => setShiftText(e.target.value)}
+              placeholder="You have successfully added a shift: Thu, Mar 5, 2026 from 15:30 to 18:00..."
+              className="w-full min-h-36 rounded-xl border border-slate-300 p-3 text-sm text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              disabled={isProcessing}
+            />
+          </div>
+        )}
+
         {preview && (
           <div className="mt-8 animate-fade-in">
             <div className="flex items-center justify-between mb-3">
@@ -182,7 +271,6 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
               />
             </div>
             
-            {/* Action Buttons */}
             <div className="flex gap-3">
               <button
                 onClick={handleProcess}
@@ -202,7 +290,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
-                    Process Calendar
+                    {inputMode === 'calendar' ? 'Process Calendar' : 'Process Screenshot'}
                   </span>
                 )}
               </button>
@@ -221,10 +309,21 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
             </div>
           </div>
         )}
+
+        {inputMode === 'shift' && shiftText.trim().length > 0 && (
+          <div className="mt-4">
+            <button
+              onClick={handleProcessShiftText}
+              disabled={isProcessing}
+              className="w-full px-6 py-3 bg-gradient-to-r from-teal-600 to-cyan-600 text-white rounded-xl hover:from-teal-700 hover:to-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold shadow-lg shadow-cyan-200"
+            >
+              Process Pasted Messages
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Crop Screen Modal */}
-      {showCropScreen && originalPreview && (
+      {inputMode === 'calendar' && showCropScreen && originalPreview && (
         <CropScreen
           imageSrc={originalPreview}
           onCropComplete={handleCropComplete}

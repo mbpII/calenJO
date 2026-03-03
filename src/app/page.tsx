@@ -42,7 +42,7 @@ export default function Home() {
         {/* Footer */}
         <div className="mt-16 text-center">
           <p className="text-slate-300 text-sm">
-            Supports calendar images with red-marked dates
+            Supports calendar screenshots and pasted shift confirmation messages
           </p>
         </div>
       </div>

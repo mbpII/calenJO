@@ -7,7 +7,9 @@ import {
   ColorDetectionFactory, 
   StrategyType, 
   extractTextFromRegions,
+  extractTextFromImage,
   parseCalendarFromOCR,
+  parseShiftMessagesFromText,
   generateICS,
   downloadICSFile
 } from '@/lib';
@@ -93,6 +95,70 @@ export const CalendarProcessor: React.FC = () => {
     }
   }, [year, month]);
 
+  const handleShiftScreenshotUpload = useCallback(async (file: File) => {
+    try {
+      setProcessingState({
+        status: 'extracting',
+        progress: 30,
+        message: 'Reading screenshot text with OCR...'
+      });
+
+      const ocrText = await extractTextFromImage(file);
+
+      setProcessingState({
+        status: 'parsing',
+        progress: 70,
+        message: 'Parsing shift messages...'
+      });
+
+      const parsedEvents = parseShiftMessagesFromText(ocrText.text, year);
+      setEvents(parsedEvents);
+
+      if (parsedEvents.length > 0) {
+        setYear(parsedEvents[0].date.getFullYear());
+        setMonth(parsedEvents[0].date.getMonth() + 1);
+      }
+
+      setProcessingState({
+        status: parsedEvents.length > 0 ? 'complete' : 'error',
+        progress: parsedEvents.length > 0 ? 100 : 0,
+        message: parsedEvents.length > 0
+          ? `Successfully extracted ${parsedEvents.length} shift events from screenshot!`
+          : 'No shift messages detected. Try a clearer screenshot or paste the message text directly.'
+      });
+    } catch (error) {
+      setProcessingState({
+        status: 'error',
+        progress: 0,
+        message: `Error: ${error instanceof Error ? error.message : 'Unknown error occurred'}`
+      });
+    }
+  }, [year]);
+
+  const handleShiftTextSubmit = useCallback((text: string) => {
+    setProcessingState({
+      status: 'parsing',
+      progress: 60,
+      message: 'Parsing pasted shift messages...'
+    });
+
+    const parsedEvents = parseShiftMessagesFromText(text, year);
+    setEvents(parsedEvents);
+
+    if (parsedEvents.length > 0) {
+      setYear(parsedEvents[0].date.getFullYear());
+      setMonth(parsedEvents[0].date.getMonth() + 1);
+    }
+
+    setProcessingState({
+      status: parsedEvents.length > 0 ? 'complete' : 'error',
+      progress: parsedEvents.length > 0 ? 100 : 0,
+      message: parsedEvents.length > 0
+        ? `Successfully extracted ${parsedEvents.length} shift events from pasted text!`
+        : 'No shift messages detected. Make sure the text includes date and time ranges (for example: Mar 5, 2026 from 15:30 to 18:00).'
+    });
+  }, [year]);
+
   const handleClear = useCallback(() => {
     setProcessingState({
       status: 'idle',
@@ -147,6 +213,8 @@ export const CalendarProcessor: React.FC = () => {
     <div className="max-w-4xl mx-auto space-y-6">
       <ImageUploader
         onImageUpload={handleImageUpload}
+        onShiftScreenshotUpload={handleShiftScreenshotUpload}
+        onShiftTextSubmit={handleShiftTextSubmit}
         onClear={handleClear}
         selectedStrategy={selectedStrategy}
         selectedCalendarType={selectedCalendarType}

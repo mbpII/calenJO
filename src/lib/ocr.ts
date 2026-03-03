@@ -7,6 +7,11 @@ export interface OCRResult {
   confidence: number;
 }
 
+export interface OCRTextResult {
+  text: string;
+  confidence: number;
+}
+
 export async function extractTextFromRegions(
   imageFile: File, 
   regions: Region[]
@@ -81,6 +86,55 @@ export async function extractTextFromRegions(
   
   URL.revokeObjectURL(imageUrl);
   return results;
+}
+
+export async function extractTextFromImage(imageFile: File): Promise<OCRTextResult> {
+  const preprocessedBlob = await preprocessImageForOCR(imageFile);
+
+  const result = await Tesseract.recognize(preprocessedBlob, 'eng', {
+    logger: () => {},
+    errorHandler: () => {},
+  });
+
+  return {
+    text: result.data.text.trim(),
+    confidence: result.data.confidence,
+  };
+}
+
+async function preprocessImageForOCR(imageFile: File): Promise<Blob> {
+  const imageUrl = URL.createObjectURL(imageFile);
+  const img = await loadImage(imageUrl);
+
+  const canvas = document.createElement('canvas');
+
+  const minWidth = 1200;
+  const scale = img.width < minWidth ? minWidth / img.width : 1;
+  canvas.width = Math.round(img.width * scale);
+  canvas.height = Math.round(img.height * scale);
+
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = imageData.data;
+
+  for (let i = 0; i < data.length; i += 4) {
+    const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    const contrast = gray < 165 ? 0 : 255;
+
+    data[i] = contrast;
+    data[i + 1] = contrast;
+    data[i + 2] = contrast;
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+
+  const blob = await canvasToBlob(canvas);
+  URL.revokeObjectURL(imageUrl);
+  return blob;
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {
