@@ -1,20 +1,23 @@
 import { CalendarEvent } from '@/types/calendar';
+import { MONTH_ABBREVIATIONS } from './constants';
 
-const MONTH_MAP: Record<string, number> = {
-  jan: 0,
-  feb: 1,
-  mar: 2,
-  apr: 3,
-  may: 4,
-  jun: 5,
-  jul: 6,
-  aug: 7,
-  sep: 8,
-  oct: 9,
-  nov: 10,
-  dec: 11,
-};
-
+/**
+ * Parses shift confirmation messages from OCR text or pasted content.
+ * Extracts date and time ranges from Amazon-style shift messages.
+ *
+ * Supported format: "[Day], Month DD, [YYYY] from HH:MM to HH:MM"
+ * Examples:
+ * - "Thu, Mar 5, 2026 from 15:30 to 18:00"
+ * - "March 15 from 09:00-17:00"
+ * - "Sat, January 10, 2025 from 08:00 to 16:30"
+ *
+ * The parser is OCR-tolerant and handles common misreadings like
+ * "15;30" instead of "15:30" and "t0" instead of "to".
+ *
+ * @param text - Raw text from OCR or pasted content
+ * @param fallbackYear - Year to use if date doesn't include one (defaults to current year)
+ * @returns Array of CalendarEvent objects, sorted by date then start time
+ */
 export function parseShiftMessagesFromText(text: string, fallbackYear: number = new Date().getFullYear()): CalendarEvent[] {
   const normalized = normalizeOCRText(text);
   const events: CalendarEvent[] = [];
@@ -25,7 +28,7 @@ export function parseShiftMessagesFromText(text: string, fallbackYear: number = 
   let match = messagePattern.exec(normalized);
   while (match) {
     const monthToken = match[1].slice(0, 3).toLowerCase();
-    const month = MONTH_MAP[monthToken];
+    const month = MONTH_ABBREVIATIONS[monthToken];
     const day = Number.parseInt(match[2], 10);
     const year = match[3] ? Number.parseInt(match[3], 10) : fallbackYear;
     const startTime = normalizeTime(match[4]);

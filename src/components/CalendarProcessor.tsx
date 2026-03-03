@@ -42,7 +42,15 @@ export const CalendarProcessor: React.FC = () => {
       const canvas = document.createElement('canvas');
       canvas.width = img.width;
       canvas.height = img.height;
-      const ctx = canvas.getContext('2d')!;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        setProcessingState({
+          status: 'error',
+          progress: 0,
+          message: 'Failed to get 2D canvas context. Your browser may not support canvas.'
+        });
+        return;
+      }
       ctx.drawImage(img, 0, 0);
       
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);

@@ -2,8 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { StrategyType } from '@/lib/strategies';
-
-const STORAGE_KEY = 'calcSync-strategy';
+import { STORAGE_KEYS } from '@/lib/constants';
 
 export function useStrategyState(): [StrategyType, (strategy: StrategyType) => void] {
   // Default to 'opencv' for better accuracy (robust detection)
@@ -12,7 +11,7 @@ export function useStrategyState(): [StrategyType, (strategy: StrategyType) => v
 
   // Read from sessionStorage after hydration
   useEffect(() => {
-    const stored = sessionStorage.getItem(STORAGE_KEY);
+    const stored = sessionStorage.getItem(STORAGE_KEYS.STRATEGY_PREFERENCE);
     if (stored === 'canvas' || stored === 'opencv') {
       setStrategyState(stored);
     }
@@ -21,7 +20,7 @@ export function useStrategyState(): [StrategyType, (strategy: StrategyType) => v
 
   const setStrategy = useCallback((newStrategy: StrategyType) => {
     setStrategyState(newStrategy);
-    sessionStorage.setItem(STORAGE_KEY, newStrategy);
+    sessionStorage.setItem(STORAGE_KEYS.STRATEGY_PREFERENCE, newStrategy);
   }, []);
 
   return [strategy, setStrategy];

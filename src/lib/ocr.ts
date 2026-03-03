@@ -12,6 +12,19 @@ export interface OCRTextResult {
   confidence: number;
 }
 
+/**
+ * Extracts text from multiple regions of an image using OCR.
+ * Each region is preprocessed (upsampled, contrast-enhanced) for better accuracy.
+ *
+ * @param imageFile - The source image file
+ * @param regions - Array of regions (bounding boxes) to extract text from
+ * @returns Promise of OCR results with text, region info, and confidence scores
+ *
+ * @example
+ * const results = await extractTextFromRegions(file, [
+ *   { x: 100, y: 200, width: 50, height: 30 }
+ * ]);
+ */
 export async function extractTextFromRegions(
   imageFile: File, 
   regions: Region[]
@@ -88,6 +101,18 @@ export async function extractTextFromRegions(
   return results;
 }
 
+/**
+ * Extracts all text from an entire image using OCR.
+ * The image is preprocessed (upsampled, contrast-enhanced) for better accuracy.
+ * Useful for reading text from screenshots and other full-image sources.
+ *
+ * @param imageFile - The source image file
+ * @returns Promise of OCR result with full text and confidence score
+ *
+ * @example
+ * const result = await extractTextFromImage(screenshotFile);
+ * console.log(result.text);
+ */
 export async function extractTextFromImage(imageFile: File): Promise<OCRTextResult> {
   const preprocessedBlob = await preprocessImageForOCR(imageFile);
 

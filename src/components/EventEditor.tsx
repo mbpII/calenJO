@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { CalendarEvent } from '@/types/calendar';
+import { MONTH_NAMES } from '@/lib/constants';
 
 interface EventEditorProps {
   events: CalendarEvent[];
@@ -76,13 +77,8 @@ export const EventEditor: React.FC<EventEditorProps> = ({
       return fallbackDate;
     }
 
-    return new Date(yearPart, monthPart - 1, dayPart);
+  return new Date(yearPart, monthPart - 1, dayPart);
   };
-
-  const months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
 
   return (
     <div className="bg-white rounded-2xl shadow-xl p-8 card-hover">
@@ -139,7 +135,7 @@ export const EventEditor: React.FC<EventEditorProps> = ({
             className="w-full px-4 py-2.5 bg-white border border-slate-400 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm font-semibold text-slate-900 appearance-none cursor-pointer pr-10"
             style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23334155' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
           >
-            {months.map((m, index) => (
+            {MONTH_NAMES.map((m, index) => (
               <option key={index} value={index + 1} className="text-slate-900">
                 {m}
               </option>
