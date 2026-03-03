@@ -86,3 +86,15 @@ button:not(:disabled):active {
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
 }
+
+input,
+textarea,
+select {
+  color-scheme: light;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #64748b;
+  opacity: 1;
+}

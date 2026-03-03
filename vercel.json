@@ -3,5 +3,6 @@
   "outputDirectory": "dist",
   "installCommand": "npm install",
   "cleanUrls": true,
-  "trailingSlash": false
+  "trailingSlash": false,
+  "framework": "other"
 }

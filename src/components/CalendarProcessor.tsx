@@ -95,23 +95,49 @@ export const CalendarProcessor: React.FC = () => {
     }
   }, [year, month]);
 
-  const handleShiftScreenshotUpload = useCallback(async (file: File) => {
+  const handleShiftScreenshotUpload = useCallback(async (files: File[]) => {
     try {
+      if (files.length === 0) {
+        setProcessingState({
+          status: 'error',
+          progress: 0,
+          message: 'No screenshots selected. Add one or more screenshots first.'
+        });
+        return;
+      }
+
       setProcessingState({
         status: 'extracting',
-        progress: 30,
-        message: 'Reading screenshot text with OCR...'
+        progress: 10,
+        message: `Reading ${files.length} screenshot${files.length === 1 ? '' : 's'} with OCR...`
       });
 
-      const ocrText = await extractTextFromImage(file);
+      const eventMap = new Map<string, CalendarEvent>();
 
-      setProcessingState({
-        status: 'parsing',
-        progress: 70,
-        message: 'Parsing shift messages...'
-      });
+      for (let index = 0; index < files.length; index += 1) {
+        const file = files[index];
+        const ocrText = await extractTextFromImage(file);
+        const parsedFromScreenshot = parseShiftMessagesFromText(ocrText.text, year);
 
-      const parsedEvents = parseShiftMessagesFromText(ocrText.text, year);
+        for (const event of parsedFromScreenshot) {
+          const dedupeKey = `${event.date.getTime()}-${event.startTime || ''}-${event.endTime || ''}`;
+          if (!eventMap.has(dedupeKey)) {
+            eventMap.set(dedupeKey, event);
+          }
+        }
+
+        const progress = Math.round(((index + 1) / files.length) * 80) + 10;
+        setProcessingState({
+          status: 'parsing',
+          progress,
+          message: `Processed ${index + 1}/${files.length} screenshot${files.length === 1 ? '' : 's'}...`
+        });
+      }
+
+      const parsedEvents = Array.from(eventMap.values()).sort(
+        (a, b) => a.date.getTime() - b.date.getTime() || (a.startTime || '').localeCompare(b.startTime || '')
+      );
+
       setEvents(parsedEvents);
 
       if (parsedEvents.length > 0) {
@@ -123,8 +149,8 @@ export const CalendarProcessor: React.FC = () => {
         status: parsedEvents.length > 0 ? 'complete' : 'error',
         progress: parsedEvents.length > 0 ? 100 : 0,
         message: parsedEvents.length > 0
-          ? `Successfully extracted ${parsedEvents.length} shift events from screenshot!`
-          : 'No shift messages detected. Try a clearer screenshot or paste the message text directly.'
+          ? `Successfully extracted ${parsedEvents.length} shift events from ${files.length} screenshot${files.length === 1 ? '' : 's'}!`
+          : 'No shift messages detected. Try clearer screenshots or paste the message text directly.'
       });
     } catch (error) {
       setProcessingState({
@@ -217,7 +243,9 @@ export const CalendarProcessor: React.FC = () => {
         onShiftTextSubmit={handleShiftTextSubmit}
         onClear={handleClear}
         selectedStrategy={selectedStrategy}
+        onStrategyChange={setSelectedStrategy}
         selectedCalendarType={selectedCalendarType}
+        onCalendarTypeChange={setSelectedCalendarType}
         isProcessing={isProcessing}
       />
 

@@ -39,12 +39,19 @@ export const EventEditor: React.FC<EventEditorProps> = ({
   };
 
   const handleAddEvent = () => {
+    const now = new Date();
+    const hours = now.getHours().toString().padStart(2, '0');
+    const minutes = now.getMinutes().toString().padStart(2, '0');
+    const currentTime = `${hours}:${minutes}`;
+    
     const newEvent: CalendarEvent = {
       id: `event-manual-${Date.now()}`,
-      title: 'New Event',
-      date: new Date(year, month - 1, 1),
+      title: 'Amazon Shift',
+      date: new Date(),
+      startTime: currentTime,
     };
     onEventsChange([...events, newEvent]);
+    setEditingId(newEvent.id);
   };
 
   const formatDate = (date: Date) => {
@@ -55,13 +62,30 @@ export const EventEditor: React.FC<EventEditorProps> = ({
     });
   };
 
+  const formatDateForInput = (date: Date) => {
+    const yearValue = date.getFullYear();
+    const monthValue = (date.getMonth() + 1).toString().padStart(2, '0');
+    const dayValue = date.getDate().toString().padStart(2, '0');
+    return `${yearValue}-${monthValue}-${dayValue}`;
+  };
+
+  const parseInputDate = (value: string, fallbackDate: Date) => {
+    const [yearPart, monthPart, dayPart] = value.split('-').map(Number);
+
+    if (!yearPart || !monthPart || !dayPart) {
+      return fallbackDate;
+    }
+
+    return new Date(yearPart, monthPart - 1, dayPart);
+  };
+
   const months = [
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
 
   return (
-    <div className="glass rounded-2xl shadow-xl p-8 card-hover">
+    <div className="bg-white rounded-2xl shadow-xl p-8 card-hover">
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <div className="flex items-center gap-3">
@@ -72,7 +96,7 @@ export const EventEditor: React.FC<EventEditorProps> = ({
           </div>
           <div>
             <h2 className="text-2xl font-bold text-slate-800">Extracted Events</h2>
-            <p className="text-sm text-slate-500">{events.length} event{events.length !== 1 ? 's' : ''} found</p>
+            <p className="text-sm text-slate-700">{events.length} event{events.length !== 1 ? 's' : ''} found</p>
           </div>
         </div>
         <button
@@ -89,8 +113,8 @@ export const EventEditor: React.FC<EventEditorProps> = ({
       {/* Date Settings */}
       <div className="grid md:grid-cols-2 gap-4 mb-6 p-4 bg-slate-50/80 rounded-xl border border-slate-200">
         <div className="space-y-2">
-          <label className="text-sm font-medium text-slate-600 flex items-center gap-2">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
+            <svg className="w-4 h-4 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
             Year
@@ -99,12 +123,12 @@ export const EventEditor: React.FC<EventEditorProps> = ({
             type="number"
             value={year}
             onChange={(e) => onYearChange(parseInt(e.target.value))}
-            className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm font-medium text-slate-900"
+            className="w-full px-4 py-2.5 bg-white border border-slate-400 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm font-semibold text-slate-900 placeholder:text-slate-500"
           />
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-medium text-slate-600 flex items-center gap-2">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <label className="text-sm font-medium text-slate-700 flex items-center gap-2">
+            <svg className="w-4 h-4 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
             Month
@@ -112,8 +136,8 @@ export const EventEditor: React.FC<EventEditorProps> = ({
           <select
             value={month}
             onChange={(e) => onMonthChange(parseInt(e.target.value))}
-            className="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm font-medium text-slate-900 appearance-none cursor-pointer pr-10"
-            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748b' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
+            className="w-full px-4 py-2.5 bg-white border border-slate-400 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm font-semibold text-slate-900 appearance-none cursor-pointer pr-10"
+            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23334155' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '16px' }}
           >
             {months.map((m, index) => (
               <option key={index} value={index + 1} className="text-slate-900">
@@ -127,12 +151,12 @@ export const EventEditor: React.FC<EventEditorProps> = ({
       {events.length === 0 ? (
         <div className="text-center py-12 bg-slate-50/50 rounded-2xl border border-dashed border-slate-300">
           <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-slate-100 flex items-center justify-center">
-            <svg className="w-8 h-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-8 h-8 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-          <p className="text-slate-500 font-medium">No events extracted</p>
-          <p className="text-sm text-slate-400 mt-1">Try adjusting your calendar image or detection strategy</p>
+          <p className="text-slate-700 font-semibold text-base">No events extracted</p>
+          <p className="text-sm text-slate-600 mt-1">Try adjusting your calendar image or detection strategy</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -140,16 +164,16 @@ export const EventEditor: React.FC<EventEditorProps> = ({
             <table className="min-w-full divide-y divide-slate-200">
               <thead className="bg-gradient-to-r from-slate-50 to-slate-100">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">
                     Date
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">
                     Title
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-bold text-slate-800 uppercase tracking-wider">
                     Time
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-right text-xs font-bold text-slate-800 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
@@ -161,11 +185,11 @@ export const EventEditor: React.FC<EventEditorProps> = ({
                       {editingId === event.id ? (
                         <input
                           type="date"
-                          value={event.date.toISOString().split('T')[0]}
+                          value={formatDateForInput(event.date)}
                           onChange={(e) => handleEventUpdate(event.id, { 
-                            date: new Date(e.target.value) 
+                            date: parseInputDate(e.target.value, event.date)
                           })}
-                          className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                          className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                         />
                       ) : (
                         <span className="font-medium text-slate-700">{formatDate(event.date)}</span>
@@ -179,7 +203,8 @@ export const EventEditor: React.FC<EventEditorProps> = ({
                           onChange={(e) => handleEventUpdate(event.id, { 
                             title: e.target.value 
                           })}
-                          className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                          placeholder="Event title"
+                          className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                         />
                       ) : (
                         <span className="text-slate-800 font-medium">{event.title}</span>
@@ -194,23 +219,25 @@ export const EventEditor: React.FC<EventEditorProps> = ({
                             onChange={(e) => handleEventUpdate(event.id, { 
                               startTime: e.target.value || undefined 
                             })}
-                            className="w-24 px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                            placeholder="Start"
+                            className="w-24 px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                           />
-                          <span className="text-slate-400">-</span>
+                          <span className="text-slate-700 font-bold">-</span>
                           <input
                             type="time"
                             value={event.endTime || ''}
                             onChange={(e) => handleEventUpdate(event.id, { 
                               endTime: e.target.value || undefined 
                             })}
-                            className="w-24 px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                            placeholder="End"
+                            className="w-24 px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                           />
                         </div>
                       ) : (
-                        <span className="text-slate-500">
+                        <span className="text-slate-700">
                           {event.startTime 
                             ? `${event.startTime}${event.endTime ? ` - ${event.endTime}` : ''}`
-                            : <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full text-xs">All day</span>
+                            : <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-700 rounded-full text-xs">All day</span>
                           }
                         </span>
                       )}
@@ -230,7 +257,7 @@ export const EventEditor: React.FC<EventEditorProps> = ({
                         <div className="flex items-center justify-end gap-2">
                           <button
                             onClick={() => setEditingId(event.id)}
-                            className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                            className="p-1.5 text-slate-700 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
                             title="Edit"
                           >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -239,7 +266,7 @@ export const EventEditor: React.FC<EventEditorProps> = ({
                           </button>
                           <button
                             onClick={() => handleDeleteEvent(event.id)}
-                            className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            className="p-1.5 text-slate-700 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                             title="Delete"
                           >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
